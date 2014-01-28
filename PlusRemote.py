@@ -37,6 +37,7 @@ class PlusRemoteWidget:
       self.parent.show()
 
     self.currentDirectory = '.'
+    self.plusRemoteModuleDirectoryPath = slicer.modules.plusremote.path.replace("PlusRemote.py","")
 
       
   def setup(self):
@@ -95,32 +96,39 @@ class PlusRemoteWidget:
     connectorLayout.addRow("OpenIGTLinkConnector: ", self.linkInputSelector)    
     
     # Recording
-    recordingCollapsibleButton = ctk.ctkCollapsibleButton()
-    recordingCollapsibleButton.text = "Recording"
-    self.layout.addWidget(recordingCollapsibleButton)    
-    recordingLayout = qt.QFormLayout(recordingCollapsibleButton)
+    
+    self.recordingCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.recordingCollapsibleButton.text = "Recording"
+    self.recordingCollapsibleButton.enabled = False
+    self.layout.addWidget(self.recordingCollapsibleButton)    
+    recordingLayout = qt.QFormLayout(self.recordingCollapsibleButton)
 
     self.captureIDBox = qt.QLineEdit()
     # recordingLayout.addRow("Capture Device ID: ", self.captureIDBox)    
     
     self.fileNameBox = qt.QLineEdit()
-    recordingLayout.addRow("Filename: ", self.fileNameBox)
+    recordingLayout.addRow("Output Filename: ", self.fileNameBox)
      
     self.directoryButton = ctk.ctkDirectoryButton()
-    recordingLayout.addRow("Directory: ", self.directoryButton)
+    recordingLayout.addRow("Output Directory: ", self.directoryButton)
 
     # Move to the same row, use grid layout
-    self.startRecordingButton = qt.QPushButton("Start Recording")
-    recordingLayout.addRow(self.startRecordingButton)
+    self.recordIcon = qt.QIcon(self.plusRemoteModuleDirectoryPath+'/Resources/Icons/icon_Record.png')
+    self.stopIcon = qt.QIcon(self.plusRemoteModuleDirectoryPath+'/Resources/Icons/icon_Stop.png')
+    self.recordingButton = qt.QPushButton('Start Recording')
+    self.recordingButton.checkable = True
+    self.recordingButton.setIcon(self.recordIcon)
+    recordingLayout.addRow(self.recordingButton)
     
-    self.stopRecordingButton = qt.QPushButton("Stop Recording")
-    recordingLayout.addRow(self.stopRecordingButton)
+    # self.stopRecordingButton = qt.QPushButton("Stop Recording")
+    # recordingLayout.addRow(self.stopRecordingButton)
      
     # Reconstruction
-    reconstructionCollapsibleButton = ctk.ctkCollapsibleButton()
-    reconstructionCollapsibleButton.text = "Reconstruction"
-    self.layout.addWidget(reconstructionCollapsibleButton)    
-    reconstructionLayout = qt.QFormLayout(reconstructionCollapsibleButton)
+    self.reconstructionCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.reconstructionCollapsibleButton.text = "Reconstruction"
+    self.reconstructionCollapsibleButton.enabled = False
+    self.layout.addWidget(self.reconstructionCollapsibleButton)    
+    reconstructionLayout = qt.QFormLayout(self.reconstructionCollapsibleButton)
 
     # Move to the same row, use grid layout
     self.startReconstuctionButton = qt.QPushButton("Start Reconstruction")
@@ -133,10 +141,11 @@ class PlusRemoteWidget:
     reconstructionLayout.addRow(self.reconstructVolumeButton)
     
     # Transform Update
-    transformUpdateCollapsibleButton = ctk.ctkCollapsibleButton()
-    transformUpdateCollapsibleButton.text = "Transform Update"
-    self.layout.addWidget(transformUpdateCollapsibleButton)    
-    transformUpdateLayout = qt.QFormLayout(transformUpdateCollapsibleButton)
+    self.transformUpdateCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.transformUpdateCollapsibleButton.text = "Transform Update"
+    self.transformUpdateCollapsibleButton.enabled = False
+    self.layout.addWidget(self.transformUpdateCollapsibleButton)    
+    transformUpdateLayout = qt.QFormLayout(self.transformUpdateCollapsibleButton)
     
     self.transformUpdateInputSelector = slicer.qMRMLNodeComboBox()
     self.transformUpdateInputSelector.nodeTypes = ( ("vtkMRMLLinearTransformNode"), "" )
@@ -160,18 +169,19 @@ class PlusRemoteWidget:
     self.saveTransformButton = qt.QPushButton("Save Config")
     transformUpdateLayout.addRow(self.saveTransformButton)
     
-    replyUpdateCollapsibleButton = ctk.ctkCollapsibleButton()
-    replyUpdateCollapsibleButton.text = "Reply"
-    self.layout.addWidget(replyUpdateCollapsibleButton)    
-    replyLayout = qt.QFormLayout(replyUpdateCollapsibleButton)
+    self.replyUpdateCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.replyUpdateCollapsibleButton.text = "Reply"
+    self.replyUpdateCollapsibleButton.enabled = False
+    self.layout.addWidget(self.replyUpdateCollapsibleButton)    
+    replyLayout = qt.QFormLayout(self.replyUpdateCollapsibleButton)
     
     self.replyBox = qt.QPlainTextEdit()
     self.replyBox.setReadOnly(True)
     replyLayout.addRow(self.replyBox)
     
     # connections
-    self.startRecordingButton.connect('clicked(bool)', self.onStartRecording)
-    self.stopRecordingButton.connect('clicked(bool)', self.onStopRecording)
+    self.linkInputSelector.connect('currentNodeChanged(bool)', self.enableOrDisableCollapsibleButtons)
+    self.recordingButton.connect('toggled(bool)', self.onRecording)
     
     self.startReconstuctionButton.connect('clicked(bool)', self.onStartReconstruction)
     self.stopReconstructionButton.connect('clicked(bool)', self.onStopReconstruction)
@@ -187,17 +197,28 @@ class PlusRemoteWidget:
   def cleanup(self):
     pass
 
-  def onStartRecording(self):
-    logic = PlusRemoteLogic()
-    self.lastCommandId = logic.startRecording(self.linkInputSelector.currentNode().GetID(),
-        self.captureIDBox.text, self.currentDirectory, self.fileNameBox.text)
-    self.setTimer()
-  
-  def onStopRecording(self):
-    logic = PlusRemoteLogic()
-    self.lastCommandId = logic.stopRecording(self.linkInputSelector.currentNode().GetID(), self.captureIDBox.text)
-    self.setTimer()
-    
+  def enableOrDisableCollapsibleButtons(self):
+    self.recordingCollapsibleButton.enabled = self.linkInputSelector.currentNode() != None
+    self.reconstructionCollapsibleButton.enabled = self.linkInputSelector.currentNode() != None
+    self.transformUpdateCollapsibleButton.enabled = self.linkInputSelector.currentNode() != None
+    self.replyUpdateCollapsibleButton.enabled = self.linkInputSelector.currentNode() != None
+
+  def onRecording(self,status):
+    print status
+    if status == True:
+      self.recordingButton.setText('Stop Recording')
+      self.recordingButton.setIcon(self.stopIcon)
+      logic = PlusRemoteLogic()
+      self.lastCommandId = logic.startRecording(self.linkInputSelector.currentNode().GetID(),
+      self.captureIDBox.text, self.currentDirectory, self.fileNameBox.text)
+      self.setTimer()
+    else:
+      self.recordingButton.setText('Start Recording')
+      self.recordingButton.setIcon(self.recordIcon)
+      logic = PlusRemoteLogic()
+      self.lastCommandId = logic.stopRecording(self.linkInputSelector.currentNode().GetID(), self.captureIDBox.text)
+      self.setTimer()
+      
   def onStartReconstruction(self):
     logic = PlusRemoteLogic()
     self.lastCommandId = logic.startVolumeReconstuction( self.linkInputSelector.currentNode().GetID())
