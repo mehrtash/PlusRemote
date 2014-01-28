@@ -1,4 +1,5 @@
 from __main__ import vtk, qt, ctk, slicer
+import datetime
 #
 # PlusRemote
 #
@@ -105,10 +106,7 @@ class PlusRemoteWidget:
 
     self.captureIDBox = qt.QLineEdit()
     # recordingLayout.addRow("Capture Device ID: ", self.captureIDBox)    
-    
-    self.fileNameBox = qt.QLineEdit()
-    recordingLayout.addRow("Output Filename: ", self.fileNameBox)
-     
+        
     self.directoryButton = ctk.ctkDirectoryButton()
     recordingLayout.addRow("Output Directory: ", self.directoryButton)
 
@@ -136,7 +134,10 @@ class PlusRemoteWidget:
     
     self.stopReconstructionButton = qt.QPushButton("Stop Reconstruction")
     # reconstructionLayout.addRow(self.stopReconstructionButton)
-     
+    
+    self.fileNameBox = qt.QLineEdit()
+    reconstructionLayout.addRow("Tracked Image Sequence Filename: ", self.fileNameBox)
+  
     self.reconstructVolumeButton = qt.QPushButton("Reconstruct Recorded Volume")
     reconstructionLayout.addRow(self.reconstructVolumeButton)
     
@@ -206,11 +207,13 @@ class PlusRemoteWidget:
   def onRecording(self,status):
     print status
     if status == True:
+      self.outputFileName = "TrackedImageSequence_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+".mha"
+      self.fileNameBox.text = self.outputFileName
       self.recordingButton.setText('Stop Recording')
       self.recordingButton.setIcon(self.stopIcon)
       logic = PlusRemoteLogic()
       self.lastCommandId = logic.startRecording(self.linkInputSelector.currentNode().GetID(),
-      self.captureIDBox.text, self.currentDirectory, self.fileNameBox.text)
+      self.captureIDBox.text, self.currentDirectory, self.outputFileName)
       self.setTimer()
     else:
       self.recordingButton.setText('Start Recording')
@@ -230,9 +233,10 @@ class PlusRemoteWidget:
     self.setTimer()
 
   def onReconstVolume(self):
+    reconstructionOutputFileName = self.fileNameBox.text[:-4] +  "_recon_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+".mha" 
     logic = PlusRemoteLogic()
     self.lastCommandId = logic.reconstructRecorded(self.linkInputSelector.currentNode().GetID(),
-        self.currentDirectory, self.fileNameBox.text)
+        self.currentDirectory, self.fileNameBox.text, reconstructionOutputFileName)
     self.setTimer()
 
   def onDirectoryButton(self):
@@ -277,6 +281,7 @@ class PlusRemoteWidget:
     """
     import imp, sys, os, slicer
     import vtk, qt, ctk
+    import datetime
     widgetName = moduleName + "Widget"
 
     # reload the source code
@@ -336,14 +341,15 @@ class PlusRemoteLogic:
     commandCounter = slicer.modules.openigtlinkremote.logic().ExecuteCommand(connectorNodeId, "StopVolumeReconstruction", parameters)
     return commandCounter
   
-  def reconstructRecorded(self, connectorNodeId, directory, fileName):
-    parameters = "InputSeqFilename=" + "\"" + directory + "/" + fileName + "\""+ " OutputVolFilename=" + "\"" + directory + "/"+ fileName+ "_recon.mha"+"\""
+  def reconstructRecorded(self, connectorNodeId, directory, fileName, reconstructionOutputFileName):
+    parameters = "InputSeqFilename=" + "\"" + directory + "/" + fileName + "\""+ " OutputVolFilename=" + "\"" + directory + "/"+ reconstructionOutputFileName+"\""
     commandCounter = slicer.modules.openigtlinkremote.logic().ExecuteCommand(connectorNodeId, "ReconstructVolume", parameters)
     print parameters
     return commandCounter
   
-  def startRecording(self, connectorNodeId, captureName, directory, fileName):
-    parameters = "CaptureDeviceID=" + "\"" + captureName + "\"" + " OutputFilename=" + "\"" + fileName + "\""
+  def startRecording(self, connectorNodeId, captureName, directory, outputFileName):
+    parameters = "CaptureDeviceID=" + "\"" + captureName + "\"" + " OutputFilename=" + "\""  + directory + "/"+ outputFileName + "\""
+    print 'recording parameters', parameters
     commandCounter = slicer.modules.openigtlinkremote.logic().ExecuteCommand(connectorNodeId, "StartRecording", parameters)
     return commandCounter
   
