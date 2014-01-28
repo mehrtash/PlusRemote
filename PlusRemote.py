@@ -36,6 +36,8 @@ class PlusRemoteWidget:
       self.setup()
       self.parent.show()
 
+    self.currentDirectory = '.'
+
       
   def setup(self):
     # Instantiate and connect widgets
@@ -99,11 +101,14 @@ class PlusRemoteWidget:
     recordingLayout = qt.QFormLayout(recordingCollapsibleButton)
 
     self.captureIDBox = qt.QLineEdit()
-    recordingLayout.addRow("Capture Device ID: ", self.captureIDBox)    
+    # recordingLayout.addRow("Capture Device ID: ", self.captureIDBox)    
     
     self.fileNameBox = qt.QLineEdit()
     recordingLayout.addRow("Filename: ", self.fileNameBox)
      
+    self.directoryButton = ctk.ctkDirectoryButton()
+    recordingLayout.addRow("Directory: ", self.directoryButton)
+
     # Move to the same row, use grid layout
     self.startRecordingButton = qt.QPushButton("Start Recording")
     recordingLayout.addRow(self.startRecordingButton)
@@ -119,10 +124,10 @@ class PlusRemoteWidget:
 
     # Move to the same row, use grid layout
     self.startReconstuctionButton = qt.QPushButton("Start Reconstruction")
-    reconstructionLayout.addRow(self.startReconstuctionButton)
+    # reconstructionLayout.addRow(self.startReconstuctionButton)
     
     self.stopReconstructionButton = qt.QPushButton("Stop Reconstruction")
-    reconstructionLayout.addRow(self.stopReconstructionButton)
+    # reconstructionLayout.addRow(self.stopReconstructionButton)
      
     self.reconstructVolumeButton = qt.QPushButton("Reconstruct Recorded Volume")
     reconstructionLayout.addRow(self.reconstructVolumeButton)
@@ -171,6 +176,7 @@ class PlusRemoteWidget:
     self.startReconstuctionButton.connect('clicked(bool)', self.onStartReconstruction)
     self.stopReconstructionButton.connect('clicked(bool)', self.onStopReconstruction)
     self.reconstructVolumeButton.connect('clicked(bool)', self.onReconstVolume)
+    self.directoryButton.connect('directoryChanged(const QString &)',self.onDirectoryButton)
 
     self.updateTransformButton.connect('clicked(bool)', self.onUpdateTransform)
     self.saveTransformButton.connect('clicked(bool)', self.onSaveTransform)
@@ -183,7 +189,8 @@ class PlusRemoteWidget:
 
   def onStartRecording(self):
     logic = PlusRemoteLogic()
-    self.lastCommandId = logic.startRecording(self.linkInputSelector.currentNode().GetID(), self.captureIDBox.text, self.fileNameBox.text)
+    self.lastCommandId = logic.startRecording(self.linkInputSelector.currentNode().GetID(),
+        self.captureIDBox.text, self.currentDirectory, self.fileNameBox.text)
     self.setTimer()
   
   def onStopRecording(self):
@@ -203,8 +210,13 @@ class PlusRemoteWidget:
 
   def onReconstVolume(self):
     logic = PlusRemoteLogic()
-    self.lastCommandId = logic.reconstructRecorded(self.linkInputSelector.currentNode().GetID(), self.fileNameBox.text)
+    self.lastCommandId = logic.reconstructRecorded(self.linkInputSelector.currentNode().GetID(),
+        self.currentDirectory, self.fileNameBox.text)
     self.setTimer()
+
+  def onDirectoryButton(self):
+    self.currentDirectory = self.directoryButton.directory
+    print self.currentDirectory
 
   def onUpdateTransform(self):
     logic = PlusRemoteLogic()
@@ -231,7 +243,7 @@ class PlusRemoteWidget:
       self.replyBox.setPlainText(textNode.GetText(0))
       logic.discardCommand(self.lastCommandId, self.linkInputSelector.currentNode().GetID())
       self.timer.stop()
-    elif self.timeoutCounter >= 50:
+    elif self.timeoutCounter >= 500:
       self.replyBox.setPlainText("No reply: Timeout")
       logic.discardCommand(self.lastCommandId, self.linkInputSelector.currentNode().GetID())
       self.timer.stop()
@@ -303,14 +315,13 @@ class PlusRemoteLogic:
     commandCounter = slicer.modules.openigtlinkremote.logic().ExecuteCommand(connectorNodeId, "StopVolumeReconstruction", parameters)
     return commandCounter
   
-  def reconstructRecorded(self, connectorNodeId, fileName):
-    parameters = "InputSeqFilename=" + "\"" + fileName + "\""+ " OutputVolFilename=" + "\"" + "scoutFile.mha"+"\""
-    print connectorNodeId
+  def reconstructRecorded(self, connectorNodeId, directory, fileName):
+    parameters = "InputSeqFilename=" + "\"" + directory + "/" + fileName + "\""+ " OutputVolFilename=" + "\"" + directory + "/"+ fileName+ "_recon.mha"+"\""
     commandCounter = slicer.modules.openigtlinkremote.logic().ExecuteCommand(connectorNodeId, "ReconstructVolume", parameters)
     print parameters
     return commandCounter
   
-  def startRecording(self, connectorNodeId, captureName, fileName):
+  def startRecording(self, connectorNodeId, captureName, directory, fileName):
     parameters = "CaptureDeviceID=" + "\"" + captureName + "\"" + " OutputFilename=" + "\"" + fileName + "\""
     commandCounter = slicer.modules.openigtlinkremote.logic().ExecuteCommand(connectorNodeId, "StartRecording", parameters)
     return commandCounter
