@@ -233,7 +233,7 @@ class PlusRemoteWidget:
     self.setTimer()
 
   def onReconstVolume(self):
-    reconstructionOutputFileName = self.fileNameBox.text[:-4] +  "_recon_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+".mha" 
+    reconstructionOutputFileName = "Recon_" +self.fileNameBox.text[21:] +"_"+ datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+".mha" 
     logic = PlusRemoteLogic()
     self.lastCommandId = logic.reconstructRecorded(self.linkInputSelector.currentNode().GetID(),
         self.currentDirectory, self.fileNameBox.text, reconstructionOutputFileName)
